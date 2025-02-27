@@ -1,0 +1,46 @@
+---
+title: "Post Lab 2 Practice"
+author: "Nathan Grimes"
+format: 
+  html:
+    code-fold: true
+    theme: yeti
+    embed-resources: true
+execute: 
+  echo: true
+  warning: false
+  message: false
+---
+
+## Load Data and attach Packages
+
+```{r}
+
+library(tidyverse)
+library(tsibble)
+library(feasts)
+library(fable)
+# load data
+
+mauna<-read_csv(here::here("data","co2_mauna_loa.csv")) %>% 
+  mutate(date = tsibble::yearmonth(date)) %>% 
+  as_tsibble()
+```
+
+## Tasks
+
+1. Create exploratory visuals for the Mauna Loa CO2 data. Do we see any trends or patterns? 
+
+  a. Use `ggseasons` and `ggsubseries`
+  
+2. Make a forecast of the Mauna Loa CO2 data for the next 20 years. What sort of trend and season should you use? (Additive vs Multiplicative?)
+
+3. Compare the predictions of the model the the original data. Create a plot that shows the original data and the forecasted data. Then make a histogram to compare the residuals. How well do the residuals fit?
+
+## Optional Analysis
+
+Filter out the analysis to only the 2003 and make predictions for the next 20 years till now. How accurate was the model compared to actual observed values? Plot the result with actual values overlaying the predicted values
+
+Calculate the RMSE using this formula or a function from anoter package $RMSE=\sqrt\frac{\sum(\hat{y_i}-y_i)^2}{n}$ between the observed and predicted values. Then build another forecast model that uses multiplicative seasonality and compare the RMSE of the two models. The data will remain the same with the "training data" being the pre 2003 data and the "testing" the 2004-now data.
+
+How does the model performance compare with the new seasonality?

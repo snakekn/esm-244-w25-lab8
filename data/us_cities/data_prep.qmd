@@ -1,0 +1,123 @@
+---
+title: "data prep: post-lab practice for point pattern analysis"
+author: "Casey O'Hara"
+format: 
+  html:
+    embed-resources: true
+    code-fold: true
+editor: visual
+execute: 
+  echo: true
+  message: false
+  warning: false
+---
+
+```{r setup}
+library(tidyverse)
+library(sf)
+library(here)
+```
+
+# Prep cities shapefile as points
+
+<https://data.cdc.gov/500-Cities-Places/500-Cities-City-Boundaries/n44h-hy2j/about_data>
+
+This city boundary shapefile was extracted from Esri Data and Maps for ArcGIS 2014 - U.S. Populated Place Areas. This shapefile can be joined to 500 Cities city-level Data (GIS Friendly Format) in a geographic information system (GIS) to make city-level maps.
+
+**Last Updated** July 27, 2023
+
+|                     |                                                     |
+|---------------------|-----------------------------------------------------|
+| Contact Name        | 500 Cities Public Inquiries                         |
+| Contact Email       | [places\@cdc.gov](mailto:places@cdc.gov)            |
+| Publisher           | Centers for Disease Control and Prevention          |
+| Public Access Level | Public Domain                                       |
+| Bureau Code         | Centers for Disease Control and Prevention (009:20) |
+| Program Code        | HHS:Program Management (009:020)                    |
+
+```{r}
+city_centroid_f <- here('data/us_cities/city_centroids.gpkg')
+if(!file.exists(city_centroid_f)) {
+  cities_poly <- read_sf(here('data/us_cities/500Cities_City_11082016',
+                              'CityBoundaries.shp'))
+  write_sf(cities_poly, here('data/us_cities/500Cities_City_11082016.gpkg'))
+  # st_crs(cities_poly) ### epsg:3857
+  cities_centroid <- cities_poly %>% st_centroid()
+  write_sf(cities_centroid, city_centroid_f)
+}
+
+cities_centroid <- read_sf(city_centroid_f)
+```
+
+# Prep timezones as polygons
+
+Also clip to just lower 48 states...
+
+```{r}
+tz_poly <- read_sf(here('data/us_cities/tz_us/tz_us.shp'))
+# st_crs(tz_poly)
+
+tzid_out <- c('America/Sitka',
+              'America/Anchorage',
+              'America/Nome',
+              'America/Juneau',
+              'America/Metlakatla',
+              'America/Yakutat',
+              'America/Adak',
+              'Pacific/Honolulu',
+              'America/Puerto_Rico',
+              'America/St_Thomas')
+
+tz_rename <- c('New_York' = 'Eastern',
+               'Detroit'  = 'Eastern',
+               'Los_Angeles' = 'Pacific',
+               'Chicago' = 'Central',
+               'Menominee' = 'Central',
+               'Denver' = 'Mountain',
+               'Boise' = 'Mountain',
+               'Indiana' = 'Eastern',
+               'North_Dakota' = 'Central',
+               'Kentucky' = 'Eastern')
+tz_3857 <- tz_poly %>%
+  st_transform(st_crs(cities_centroid)) %>%
+  filter(!TZID %in% tzid_out) %>%
+  mutate(TZID = str_remove(TZID, 'America/') %>% str_remove('/.+')) %>%
+  mutate(TZID = ifelse(TZID %in% names(tz_rename), tz_rename[TZID], TZID))
+
+tz_vec <- tz_3857$TZID %>% unique()
+tz_map_unioned <- lapply(tz_vec, FUN = function(tz) {
+  ### tz <- 'Eastern'
+  map_tmp <- tz_3857 %>%
+    filter(TZID == tz) %>%
+    st_union() %>%
+    st_sf() %>%
+    mutate(TZID = tz)
+}) %>%
+  bind_rows()
+  
+# plot(tz_map_unioned)
+
+write_sf(tz_map_unioned, here('data/us_cities/tz_us.gpkg'))
+```
+
+# Prep cities as points with timezones bound, for quicker activity
+
+```{r}
+if(!'ZONE' %in% names(cities_centroid)) {
+  cities_centroid <- cities_centroid %>%
+    st_join(tz_map_unioned) %>%
+    mutate(ZONE = TZID) %>%
+    filter(!is.na(ZONE))
+  write_sf(cities_centroid, here('data/us_cities/city_centroids.gpkg'))
+}
+```
+
+# Plot
+
+```{r}
+ggplot() +
+  geom_sf(data = tz_map_unioned, aes(fill = TZID)) +
+  geom_sf(data = cities_centroid %>%
+            filter(POP2010 >= 100000), aes(fill = ZONE), shape = 21) +
+  scale_fill_viridis_d()
+```
