@@ -4,6 +4,7 @@ author:
   - "Casey O'Hara"
   - Nathan Grimes
   - Allison Horst
+  - Nadav Kempinski
 date: today
 format: 
   html:
@@ -41,7 +42,7 @@ voles_sf <- read_sf(dsn = here("data/voledata"),
 
 
 ### Plot it (exploratory)
-# plot(voles_sf)
+plot(voles_sf)
 
 ### Get Humboldt County outline
 humboldt_sf <- read_sf(dsn = here("data/voledata"), 
@@ -94,7 +95,7 @@ plot(voles_full)
 Run to see vole "hotspots" by kernel density, then see what happens when you change sigma here!
 
 ```{r}
-voles_density <- density(voles_full, sigma = 5000) ### try different sigmas
+voles_density <- density(voles_full, sigma = 1e3) ### try different sigmas
 
 plot(voles_density)
 ```
@@ -134,21 +135,50 @@ The observed line is much higher than the bounds of the theoritical line. We hav
 
 While the base plot looks good. Let's make our own in ggplot to practice the our wrangling skills. What is the class of the `gfunction_out` object? What are the column names? What do you think the `obs`, `theo`, `lo`, and `hi` columns represent? How do we pivot the table to a useful dataframe to plot in ggplot?
 
+```{r}
+gf_tidy = gfunction_out |>
+  as.data.frame() |>
+  pivot_longer(cols=c(-r),names_to = 'name', values_to = 'value') |> 
+  ggplot(aes(x=r,y=value,color=name))+
+  geom_line()+
+  theme_minimal()+
+  scale_fill_viridis_d()+
+  labs(x="Distance",y="G(r)")
 
+gf_tidy
+```
 
 
 ### L-Function
  
 How does the G-function differ from Ripley's K-function? 
- 
+
 
 
 With the same `envelope()` function from before, calculate the L-function. Because we're looking for the radius around points we have to change our `r` vector to match the entire size of the county ~80km. Also only use nsim=10 because it takes a long time to run.
 
 Plot the L-function and interpret the results.
 
+```{r}
+r_vec_l <- seq(0, 80000, by = 5000) 
 
 
+kfunction_out <- envelope(voles_full, fun = Lest, r = r_vec_l, 
+                          nsim = 10) 
+plot(kfunction_out)
+```
 
+```{r}
+lf_tidy = kfunction_out |>
+  as.data.frame() |>
+  pivot_longer(cols=c(-r),names_to = 'name', values_to = 'value') |> 
+  ggplot(aes(x=r,y=value,color=name))+
+  geom_line()+
+  theme_minimal()+
+  scale_fill_viridis_d()+
+  labs(x="Distance",y="K(r)")
+
+lf_tidy
+```
 
 
